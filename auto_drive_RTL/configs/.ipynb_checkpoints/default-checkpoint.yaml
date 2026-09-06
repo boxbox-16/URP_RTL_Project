@@ -1,0 +1,97 @@
+# configs/default.yaml
+
+# 1. 시스템 디버그 및 시각화 설정
+debug: false
+show_window: false
+save_outputs: false
+
+# 실시간 디버그 스트리머 (PC에서 debug_viewer.py로 수신)
+# 메인 루프 영향 최소: 구독자 없으면 zmq.NOBLOCK으로 즉시 드롭
+debug_stream:
+  enabled: false
+  port: 5556
+  fps: 2             # 디버그 스트림 최대 FPS
+  quality: 40        # JPEG 품질 (1~100)
+  scale: 0.5         # 해상도 배율 (0.5 = 320x240)
+save_every_n_frames: 30
+print_every_n_frames: 10
+resource_log_every_n_frames: 10
+
+# 2. 실행 루프 제어
+max_frames: 1000  # 0 이하면 Ctrl+C 전까지 계속 실행
+warmup_iters: 2
+target_fps: 30  # 메인 루프 최대 FPS 제한 (0 = 제한 없음). DPU 추론이 충분히 느리면 sleep은 건너뜀.
+use_actuator: true  # 실전 테스트 시 반드시 true 확인
+stop_on_invalid_mask: true
+invalid_stop_frames: 10
+
+# 3. 로그 및 프로파일링 경로 설정
+save_runtime_log: false
+save_profiling_csv: false
+runtime_log_path: logs/runtime/runtime.log
+profiling_csv_path: logs/profiling/profiling.csv
+
+# 4. 액추에이터 및 하드웨어 세부 설정
+actuator:
+  overlay_path: configs/dpu/dpu.bit  # DPU+PWM 통합 bitstream (6채널 PWM 포함)
+  mmio_range: 65536
+  # [노트북 성공값] 300MHz FPGA 클럭 기준 (DPU bitstream: clk_wiz_0 clk_out2 = 300MHz)
+  # 100MHz 기준: 200000, 300MHz 기준: 600600 (500Hz PWM)
+  period_size: 600600
+  drive_duty_percent: 1.0    # controller speed_cmd와 곱해짐. speed 0.25 기준 약 25% duty
+  steering_duty_percent: 0.80 # 10.0 -> 0.8
+  # DC 모터 최소 기동 듀티 (0.0 = 기존 비례 방식, 0.6 권장)
+  # effort > deadband 일 때 duty = period × (min + (1-min) × |effort|)
+  # 예: min=0.6이면 duty 범위 60%~100% → 12V DC 모터 기동 보장
+  steering_min_duty_percent: 0.4 # 0.6 -> 0.4
+  # 조향 명령 없을 때 양쪽 채널 동시 활성화 duty (0.0=비활성/프리휠, 0.3 권장)
+  # 양방향 동일 duty → 기구적 중앙 위치 복귀력 제공
+  steering_center_hold_percent: 0.3
+  steering_feedback_control: false
+  steering_feedback_kp: 1.0
+  steering_feedback_deadband: 0.05
+  command_timeout_sec: 10  # 제어 명령 갱신이 이 시간 동안 없으면 PWM 자동 차단
+  debug_readback: false  # actuator 로그에 MMIO period/duty/valid readback 포함
+  
+  # SPI 및 ADC(가변저항) 설정
+  enable_adc: false
+  spi_bus: 0
+  spi_device: 0
+  spi_mode: 0
+  spi_max_speed_hz: 20000000
+  adc_right: 240 # 노트북 실측 우측 끝값
+  adc_left: 990  # 노트북 실측 좌측 끝값
+
+  # 5. 모터 주소 및 채널 맵핑 (dpu.bit hwh 실측 기준)
+  # dpu.bit AXI주소 → PWM_out 핀 매핑 (hwh 확인):
+  #   0xA0000000 → PWM_out_0 → rear_right_fwd
+  #   0xA0010000 → PWM_out_4 → steering_right
+  #   0xA0020000 → PWM_out_3 → rear_left_fwd
+  #   0xA0030000 → PWM_out_2 → rear_left_bwd
+  #   0xA0040000 → PWM_out_1 → rear_right_bwd
+  #   0xA0050000 → PWM_out_5 → steering_left
+  motors:
+    base_addrs:
+      # 뒷바퀴 전진 채널 (Forward)
+      rear_right_fwd: "0x00A0000000" # PWM_out_0
+      rear_left_fwd:  "0x00A0020000" # PWM_out_3
+
+      # 뒷바퀴 후진 채널 (Backward)
+      rear_right_bwd: "0x00A0040000" # PWM_out_1
+      rear_left_bwd:  "0x00A0030000" # PWM_out_2
+
+      # 조향 서보 (Steering)
+      steering_right: "0x00A0010000" # PWM_out_4
+      steering_left:  "0x00A0050000" # PWM_out_5
+    
+    drive_channels:
+      - rear_right_fwd
+      - rear_left_fwd
+
+    reverse_channels:
+      - rear_right_bwd
+      - rear_left_bwd
+    
+    # 조향 채널 매칭
+    steering_right: steering_right
+    steering_left: steering_left

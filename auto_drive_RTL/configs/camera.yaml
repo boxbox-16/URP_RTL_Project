@@ -1,0 +1,14 @@
+#카메라 기본설정
+camera_index: 0
+width: 640
+height: 480
+fps: 30
+pixel_format: MJPG
+buffer_size: 2
+
+
+#roi 세팅
+roi_top_ratio: 0.00 # 상단 50% 제거 (하늘/배경 영역 차단)
+roi_bottom_ratio: 1.00
+roi_left_ratio: 0.00
+roi_right_ratio: 1.00

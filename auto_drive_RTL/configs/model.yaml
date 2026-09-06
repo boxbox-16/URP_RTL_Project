@@ -1,0 +1,9 @@
+xmodel_path: models/lane_segmentation.xmodel
+input_width: 256
+input_height: 256
+input_channels: 3
+threshold: 0.0
+normalize: true
+mean: [0.0, 0.0, 0.0]
+std: [1.0, 1.0, 1.0]
+channel_order: RGB

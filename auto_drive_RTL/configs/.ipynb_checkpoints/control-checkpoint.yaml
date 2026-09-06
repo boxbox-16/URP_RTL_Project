@@ -1,0 +1,16 @@
+reference_row_ratio: 0.70
+morph_kernel_size: 5
+min_lane_pixels: 200
+min_component_area: 80
+min_centerline_points: 5
+min_pixels_per_sample_row: 3
+centerline_row_step: 5
+kp: 0.2
+ki: 0.0
+kd: 0.5
+base_speed: 0.50 # base_speed: 0.25 min_speed: 0.10 max_speed: 0.35
+min_speed: 0.20
+max_speed: 0.80
+max_steering: 1.0
+min_steering: -1.0
+deadband: 0.02

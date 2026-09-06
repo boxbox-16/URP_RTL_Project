@@ -1,0 +1,5 @@
+export OMP_NUM_THREADS=2
+export OPENBLAS_NUM_THREADS=2
+export MKL_NUM_THREADS=2
+export NUMEXPR_NUM_THREADS=2
+export XLNX_VART_FIRMWARE=/usr/lib/dpu.xclbin

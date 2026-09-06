@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-Content \"E:\\\\URP\\\\26_1\\\\autonomous_driving_baseline\\\\logs\\\\runtime\\\\runtime.log\" -Tail 60)",
+      "Read(//home/xilinx/jupyter_notebooks/pynq-dpu/autonomous_driving_baseline/configs/dpu/**)"
+    ]
+  }
+}
