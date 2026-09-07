@@ -42,12 +42,11 @@ autonomous_driving_baseline/
       │  출력: (1, 256, 256, 1) float32 logits
       ▼
  [3] 후처리 (Postprocessing)
-      │  logits → binary 마스크 (threshold=0.0)
+      │  logits → binary 마스크 (logit >= 0.0)
       │  → Morphology OPEN+CLOSE (노이즈 제거)
-      │  → 256×256 → ROI 크기 복원
-      │  → 행별 차선 중심 x좌표 추출 (centerline)
-      │  → 기준점 선택 (reference_row_ratio=0.7 높이)
-      │  → steering_error = (ref_x - width/2) / (width/2)   ← [-1.0, +1.0]
+      │  → 256×256 전체 행에서 차선 중심 x좌표 추출
+      │  → 179행에 가장 가까운 유효 행 선택
+      │  → steering_error = (ref_x - 128) / 128
       ▼
  [4] P 제어기 (PController)
       │  steering_cmd = kp × steering_error   (kp=0.4)
@@ -82,27 +81,26 @@ autonomous_driving_baseline/
 ### [3] 후처리
 
 ```
-logits > 0.0  →  binary mask (0 or 255)
+int8 logit >= 0  →  binary mask (0 or 1)
     ↓
 Morphology OPEN (5×5)  →  작은 노이즈 제거
     ↓
 Morphology CLOSE (5×5)  →  구멍 메우기
     ↓
-connected components 필터  →  min_area=80 미만 blob 제거
+행별 중심 x 추출 (256×256 전체 행, 정수 나눗셈)
     ↓
-256×256 → ROI 크기(480×640) 복원  →  INTER_NEAREST
+기준점: y=179에 가장 가까운 유효 행
     ↓
-행별 중심 x 추출 (5픽셀 간격, 행당 최소 3픽셀)
-    ↓
-기준점: y = height × 0.7 에 가장 가까운 중심선 포인트
-    ↓
-steering_error = (ref_x - 320) / 320
+steering_error = ((ref_x - 128) << 8) / 32768
 ```
+
+이 사양은 `auto_drive/postprocessing.py`와 `auto_drive_RTL/postprocessing.py`에
+동일하게 정의되어 있으며 현재 `postproc_top` RTL을 CPU에서 재현하기 위한
+golden model이다. Morphology의 네 pass 모두 영상 밖 픽셀을 0으로 취급한다.
 
 **유효(valid) 판정 조건** (모두 만족해야 true):
 - 기준점이 존재
-- 차선 픽셀 수 ≥ 20
-- 중심선 포인트 수 ≥ 5
+- 256×256 최종 마스크의 차선 픽셀 수 ≥ 50
 
 ### [4] P 제어기
 
@@ -179,16 +177,16 @@ speed_cmd    = clamp(base_speed × max(0.4, 1 - |steering_cmd|), min_speed, max_
 
 ---
 
-## 루프 타이밍 (실측 평균, Ultra96V2)
+## 루프 타이밍
 
 | 단계 | 평균 |
 |------|------|
 | 캡처 | ~16 ms |
 | 전처리 | ~14 ms |
 | DPU 추론 | ~16 ms |
-| 후처리 | ~8 ms |
+| 후처리 | RTL-equivalent 사양으로 재측정 필요 |
 | 제어 + 액추에이터 | ~2 ms |
-| **전체** | **~56 ms (≈18fps)** |
+| **전체** | **재측정 필요** |
 
 `target_fps: 10` 설정 시 남는 시간은 sleep으로 소비.
 

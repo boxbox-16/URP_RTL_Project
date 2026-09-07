@@ -1,10 +1,10 @@
 reference_row_ratio: 0.70
 morph_kernel_size: 5
 min_lane_pixels: 50
-min_component_area: 80
-min_centerline_points: 3
+min_component_area: 0
+min_centerline_points: 1
 min_pixels_per_sample_row: 1
-centerline_row_step: 5
+centerline_row_step: 1
 kp: 0.2
 ki: 0.0
 kd: 0.5

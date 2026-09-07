@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""같은 영상에서 CPU 기준 후처리와 RTL 후처리를 공정하게 비교한다.
+"""같은 영상에서 RTL-equivalent CPU 후처리와 실제 RTL 후처리를 비교한다.
 
 RTL 오버레이를 한 번만 로드한 뒤 각 프레임을 두 경로에서 각각 전처리하고
 DPU 추론한다. 두 경로의 실행 순서는 프레임마다 바꿔 순서에 따른 캐시/온도
 편향을 줄인다. 영상 디코딩, 제어기 계산, 파일 출력은 단계별 시간에서 제외된다.
 
-실행 예:
-    python3 compare_postprocessing.py --video test.mp4 --frames 1000
+기본 사용법:
+    python3 compare_postprocessing.py
+    python3 compare_postprocessing.py drive.mp4
+    python3 compare_postprocessing.py drive.mp4 -n 1000
+
+인자를 생략하면 프로젝트 루트의 test_video.mp4 전체를 비교한다. 결과는
+comparison_results/<실행시각>/에 CSV와 JSON으로 자동 저장된다.
 """
 
 from __future__ import annotations
@@ -34,10 +39,13 @@ import cv2
 import numpy as np
 import yaml
 
+from auto_drive.postprocessing import RTLEquivalentPostProcessor
+
 
 ROOT = Path(__file__).resolve().parent
 BASE_DIR = ROOT / "auto_drive"
 RTL_DIR = ROOT / "auto_drive_RTL"
+DEFAULT_VIDEO = ROOT / "test_video.mp4"
 CONFIG_NAMES = ("default.yaml", "camera.yaml", "model.yaml", "control.yaml")
 
 POSTPROC_BASE = 0x80010000
@@ -80,6 +88,7 @@ def verify_common_inputs() -> dict[str, str]:
     paths = [
         *(Path("configs") / name for name in CONFIG_NAMES),
         Path("models/lane_segmentation.xmodel"),
+        Path("postprocessing.py"),
         Path("setup.sh"),
     ]
     mismatches: list[str] = []
@@ -199,8 +208,8 @@ class DPURunner:
         return self.out_f32
 
 
-class CPUPostProcessor:
-    """auto_drive의 기준 OpenCV/Numpy 후처리."""
+class LegacyCPUPostProcessor:
+    """이전 auto_drive 후처리. 회귀 분석용이며 성능 비교에는 사용하지 않는다."""
 
     def __init__(self, model_cfg: dict, control_cfg: dict, meta: dict):
         self.threshold = float(model_cfg["threshold"])
@@ -315,10 +324,14 @@ class RTLPostProcessor:
         signed_error = raw_error if raw_error < 0x80000000 else raw_error - 0x100000000
         hardware_valid = self.mmio.read(PP_RESULT_VLD) & 1
         lane_pixels = self.mmio.read(PP_RESULT_PX) & 0xFFFF
+        ref_x = signed_error // 256 + 128 if hardware_valid else None
         return {
             "steering_error": float(signed_error / 32768.0),
             "lane_pixels": int(lane_pixels),
             "valid": bool(hardware_valid) and lane_pixels >= self.min_lane_pixels,
+            "hardware_valid": bool(hardware_valid),
+            "reference_point": (ref_x, None),
+            "raw_error_q15": int(signed_error),
             "copy_ms": copy_ms,
             "rtl_ms": rtl_ms,
         }
@@ -442,6 +455,9 @@ def make_summary(
     rtl_commands = [float(row["rtl_steering_cmd"]) for row in rows]
     command_diffs = [abs(a - b) for a, b in zip(base_commands, rtl_commands)]
     valid_agreements = [row["baseline_valid"] == row["rtl_valid"] for row in rows]
+    lane_pixel_diffs = [
+        abs(int(row["baseline_lane_pixels"]) - int(row["rtl_lane_pixels"])) for row in rows
+    ]
     within = [difference <= steering_tolerance for difference in error_diffs]
     direction_agreements = [
         (abs(a) <= steering_tolerance and abs(b) <= steering_tolerance) or (a * b > 0)
@@ -455,6 +471,8 @@ def make_summary(
         "rtl_postprocess_faster": post_speedup is not None and post_speedup > 1.0,
         "steering_mae_within_tolerance": statistics.fmean(error_diffs) <= steering_tolerance,
         "steering_p95_within_tolerance": error_p95 <= steering_tolerance,
+        "lane_pixels_exact": not any(lane_pixel_diffs),
+        "valid_exact": all(valid_agreements),
     }
     return {
         "frames": len(rows),
@@ -471,6 +489,11 @@ def make_summary(
             "command_mae": statistics.fmean(command_diffs),
             "command_max_abs": max(command_diffs),
             "valid_agreement_ratio": statistics.fmean(valid_agreements),
+            "lane_pixels_mae": statistics.fmean(lane_pixel_diffs),
+            "lane_pixels_max_abs": max(lane_pixel_diffs),
+            "lane_pixels_exact_ratio": statistics.fmean(
+                [difference == 0 for difference in lane_pixel_diffs]
+            ),
             "baseline_valid_ratio": statistics.fmean([bool(row["baseline_valid"]) for row in rows]),
             "rtl_valid_ratio": statistics.fmean([bool(row["rtl_valid"]) for row in rows]),
         },
@@ -499,7 +522,7 @@ def print_summary(summary: dict[str, Any], output_dir: Path) -> None:
     criteria = summary["criteria"]
     print("\n=== 비교 결과 ===")
     print(f"측정 프레임: {summary['frames']}")
-    print("단계                 baseline mean     RTL mean     차이/가속")
+    print("단계                 SW 기준 mean      RTL mean     차이/가속")
     for stage, label in (
         ("preprocess_ms", "전처리"),
         ("inference_ms", "DPU 추론"),
@@ -525,12 +548,19 @@ def print_summary(summary: dict[str, Any], output_dir: Path) -> None:
         f"valid 일치={steering['valid_agreement_ratio'] * 100:.2f}%"
     )
     print(
+        f"lane_pixels: MAE={steering['lane_pixels_mae']:.3f}, "
+        f"max={steering['lane_pixels_max_abs']}, "
+        f"완전 일치={steering['lane_pixels_exact_ratio'] * 100:.2f}%"
+    )
+    print(
         "판정: "
         f"전처리 유사={criteria['preprocess_timing_similar']}, "
         f"추론 유사={criteria['inference_timing_similar']}, "
         f"RTL 후처리 가속={criteria['rtl_postprocess_faster']}, "
         f"조향 MAE 허용범위={criteria['steering_mae_within_tolerance']}, "
-        f"조향 P95 허용범위={criteria['steering_p95_within_tolerance']}"
+        f"조향 P95 허용범위={criteria['steering_p95_within_tolerance']}, "
+        f"픽셀 수 일치={criteria['lane_pixels_exact']}, "
+        f"valid 일치={criteria['valid_exact']}"
     )
     print(f"결과 저장: {output_dir}")
 
@@ -540,27 +570,63 @@ def parse_address(value: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--video", type=Path, default=ROOT / "test_video.mp4", help="동일 입력 영상")
-    parser.add_argument("--frames", type=int, default=0, help="측정 프레임 수(0: 영상 끝까지)")
-    parser.add_argument("--skip-frames", type=int, default=0, help="영상 앞에서 제외할 프레임 수")
-    parser.add_argument("--warmup", type=int, default=10, help="통계에서 제외할 워밍업 반복 수")
-    parser.add_argument("--rtl-base", type=parse_address, default=None, help="RTL IP 주소(예: 0x80010000)")
-    parser.add_argument("--rtl-timeout-ms", type=float, default=50.0)
-    parser.add_argument("--steering-tolerance", type=float, default=0.02)
-    parser.add_argument("--timing-tolerance-pct", type=float, default=10.0)
-    parser.add_argument("--print-every", type=int, default=50)
-    parser.add_argument("--output-dir", type=Path, default=None)
+    parser = argparse.ArgumentParser(
+        description="같은 주행 영상으로 RTL-equivalent SW와 실제 RTL의 속도/결과를 비교합니다.",
+        epilog=(
+            "예:\n"
+            "  python3 compare_postprocessing.py\n"
+            "  python3 compare_postprocessing.py drive.mp4\n"
+            "  python3 compare_postprocessing.py drive.mp4 -n 1000\n\n"
+            "인자 없이 실행하면 test_video.mp4 전체를 비교합니다."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "video",
+        nargs="?",
+        type=Path,
+        help="비교할 주행 영상 (기본: test_video.mp4)",
+    )
+    parser.add_argument(
+        "-n",
+        "--frames",
+        type=int,
+        default=0,
+        help="비교할 프레임 수 (기본: 0, 영상 끝까지)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="결과 폴더 (기본: comparison_results/<실행시각>)",
+    )
+
+    advanced = parser.add_argument_group("고급 옵션")
+    advanced.add_argument("--skip-frames", type=int, default=0, help="영상 앞에서 제외할 프레임 수")
+    advanced.add_argument("--warmup", type=int, default=10, help="통계에서 제외할 워밍업 반복 수")
+    advanced.add_argument("--rtl-base", type=parse_address, default=None, help="RTL IP 주소(예: 0x80010000)")
+    advanced.add_argument("--rtl-timeout-ms", type=float, default=50.0)
+    advanced.add_argument("--steering-tolerance", type=float, default=0.0)
+    advanced.add_argument("--timing-tolerance-pct", type=float, default=10.0)
+    advanced.add_argument("--print-every", type=int, default=50)
+
+    # 예전 실행 명령과의 호환성을 위한 숨김 옵션이다. 새 명령에서는 위치 인자를 쓴다.
+    parser.add_argument("--video", dest="legacy_video", type=Path, help=argparse.SUPPRESS)
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
-    video_path = args.video.expanduser().resolve()
+    if args.video is not None and args.legacy_video is not None:
+        raise ValueError("영상은 위치 인자 또는 --video 중 하나로만 지정하세요")
+    selected_video = args.video or args.legacy_video or DEFAULT_VIDEO
+    video_path = selected_video.expanduser().resolve()
     if not video_path.is_file():
         raise FileNotFoundError(
             f"영상이 없습니다: {video_path}\n"
-            "test.mp4를 프로젝트 루트에 두거나 --video로 경로를 지정하세요."
+            "영상 경로를 첫 번째 인자로 지정하세요. 예: "
+            "python3 compare_postprocessing.py drive.mp4"
         )
     if args.frames < 0 or args.skip_frames < 0 or args.warmup < 0:
         raise ValueError("--frames, --skip-frames, --warmup은 0 이상이어야 합니다")
@@ -613,7 +679,7 @@ def main() -> int:
         "baseline": Preprocessor(first_frame.shape, config["camera"], config["model"]),
         "rtl": Preprocessor(first_frame.shape, config["camera"], config["model"]),
     }
-    cpu_post = CPUPostProcessor(config["model"], config["control"], preprocessors["baseline"].meta)
+    cpu_post = RTLEquivalentPostProcessor(config["model"], config["control"])
     rtl_post = RTLPostProcessor(dpu, rtl_base, args.rtl_timeout_ms, config["control"])
     postprocessors = {"baseline": cpu_post, "rtl": rtl_post}
     controllers = {
@@ -668,6 +734,10 @@ def main() -> int:
                 row[f"{name}_steering_cmd"] = round(commands[name], 9)
                 row[f"{name}_lane_pixels"] = int(outputs[name]["lane_pixels"])
                 row[f"{name}_valid"] = bool(outputs[name]["valid"])
+                ref_x, ref_y = outputs[name]["reference_point"]
+                row[f"{name}_reference_x"] = ref_x
+                row[f"{name}_reference_y"] = ref_y
+                row[f"{name}_raw_error_q15"] = int(outputs[name]["raw_error_q15"])
             row["steering_error_abs_diff"] = round(
                 abs(row["baseline_steering_error"] - row["rtl_steering_error"]), 9
             )
@@ -680,7 +750,7 @@ def main() -> int:
             measured_index += 1
             if args.print_every > 0 and (measured_index == 1 or measured_index % args.print_every == 0):
                 print(
-                    f"frame {measured_index:5d}: CPU post={timings['baseline']['postprocess_ms']:.3f} ms, "
+                    f"frame {measured_index:5d}: SW post={timings['baseline']['postprocess_ms']:.3f} ms, "
                     f"RTL post={timings['rtl']['postprocess_ms']:.3f} ms, "
                     f"steer diff={row['steering_error_abs_diff']:.6f}"
                 )
@@ -705,6 +775,7 @@ def main() -> int:
             "skip_frames": args.skip_frames,
             "warmup_iterations": args.warmup,
             "common_stage_value_check": "preprocess array_equal and DPU int8 array_equal passed",
+            "software_postprocess_spec": "RTL-equivalent postprocessing.py",
             "execution_order": "alternating per frame",
             "timed_scope": "preprocess + DPU inference + postprocess; video decode/control/output excluded",
             "rtl_bit_sha256": sha256(rtl_bit),
