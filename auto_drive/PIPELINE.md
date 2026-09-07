@@ -94,9 +94,10 @@ Morphology CLOSE (5×5)  →  구멍 메우기
 steering_error = ((ref_x - 128) << 8) / 32768
 ```
 
-이 사양은 `auto_drive/postprocessing.py`와 `auto_drive_RTL/postprocessing.py`에
-동일하게 정의되어 있으며 현재 `postproc_top` RTL을 CPU에서 재현하기 위한
-golden model이다. Morphology의 네 pass 모두 영상 밖 픽셀을 0으로 취급한다.
+실제 소프트웨어 주행 구현은 `auto_drive/autonomous_driving.ipynb` 안에 있으며,
+비교용 golden model은 프로젝트 루트의 `compare_postprocessing.py` 안에 있다.
+RTL 주행 노트북에는 비교용 CPU 구현을 포함하지 않는다. Morphology의 네 pass
+모두 영상 밖 픽셀을 0으로 취급한다.
 
 **유효(valid) 판정 조건** (모두 만족해야 true):
 - 기준점이 존재

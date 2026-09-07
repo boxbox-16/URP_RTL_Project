@@ -1,0 +1,386 @@
+{
+  "frames": 2949,
+  "timing_ms": {
+    "preprocess_ms": {
+      "baseline": {
+        "mean": 5.77985476093591,
+        "median": 5.670699,
+        "p95": 6.188279,
+        "std": 0.3509106137791949,
+        "min": 5.533514,
+        "max": 9.537435
+      },
+      "rtl": {
+        "mean": 5.758413738555443,
+        "median": 5.66477,
+        "p95": 6.132379,
+        "std": 0.3186821551549537,
+        "min": 5.521817,
+        "max": 10.594959
+      },
+      "mean_relative_difference_pct": 0.37165060565911984,
+      "speedup_baseline_over_rtl": 1.0037234251226008
+    },
+    "inference_ms": {
+      "baseline": {
+        "mean": 14.791652225161073,
+        "median": 14.677123,
+        "p95": 15.765262,
+        "std": 0.5322596010234321,
+        "min": 14.191149,
+        "max": 21.297781
+      },
+      "rtl": {
+        "mean": 14.750952722278738,
+        "median": 14.664464,
+        "p95": 15.435687,
+        "std": 0.5126993054141883,
+        "min": 14.243821,
+        "max": 26.026207
+      },
+      "mean_relative_difference_pct": 0.27553090158938054,
+      "speedup_baseline_over_rtl": 1.0027591101163835
+    },
+    "postprocess_ms": {
+      "baseline": {
+        "mean": 2.9785390210240763,
+        "median": 2.890887,
+        "p95": 3.352654,
+        "std": 0.28172000314099854,
+        "min": 2.773192,
+        "max": 7.348433
+      },
+      "rtl": {
+        "mean": 0.9169733441844693,
+        "median": 0.889823,
+        "p95": 1.033005,
+        "std": 0.15855800220201938,
+        "min": 0.817432,
+        "max": 3.162447
+      },
+      "mean_relative_difference_pct": 105.84310784130915,
+      "speedup_baseline_over_rtl": 3.2482285771055937
+    },
+    "pipeline_ms": {
+      "baseline": {
+        "mean": 23.600630833502883,
+        "median": 23.44565,
+        "p95": 25.045861,
+        "std": 0.7041220987294294,
+        "min": 22.72065,
+        "max": 29.927529
+      },
+      "rtl": {
+        "mean": 21.473769770769753,
+        "median": 21.342743,
+        "p95": 22.514021,
+        "std": 0.6655070247223199,
+        "min": 20.777278,
+        "max": 34.56589
+      },
+      "mean_relative_difference_pct": 9.437113014128574,
+      "speedup_baseline_over_rtl": 1.0990446058347998
+    }
+  },
+  "steering": {
+    "tolerance": 0.0,
+    "error_mae": 0.0,
+    "error_rmse": 0.0,
+    "error_max_abs": 0.0,
+    "error_p95_abs": 0.0,
+    "error_correlation": 0.9999999999999999,
+    "error_within_tolerance_ratio": 1.0,
+    "direction_agreement_ratio": 1.0,
+    "command_mae": 0.0,
+    "command_max_abs": 0.0,
+    "valid_agreement_ratio": 1.0,
+    "lane_pixels_mae": 0.0,
+    "lane_pixels_max_abs": 0,
+    "lane_pixels_exact_ratio": 1.0,
+    "baseline_valid_ratio": 1.0,
+    "rtl_valid_ratio": 1.0
+  },
+  "criteria": {
+    "stage_mean_similarity_tolerance_pct": 10.0,
+    "preprocess_timing_similar": true,
+    "inference_timing_similar": true,
+    "rtl_postprocess_faster": true,
+    "steering_mae_within_tolerance": true,
+    "steering_p95_within_tolerance": true,
+    "lane_pixels_exact": true,
+    "valid_exact": true,
+    "all_pass": true
+  },
+  "metadata": {
+    "created_utc": "2026-09-07T05:07:51.165186+00:00",
+    "video": "/home/xilinx/jupyter_notebooks/URP_HW/test_video.mp4",
+    "video_sha256": "cec954a516545fb21bfc2d6f010d258137e7cb7314744bfbaba831d8e654ecf1",
+    "video_fps": 30.0,
+    "video_total_frames": 2949,
+    "skip_frames": 0,
+    "warmup_iterations_per_overlay": 10,
+    "common_stage_value_check": "all 2949 frame preprocess/DPU int8 SHA-256 matched",
+    "software_postprocess_spec": "RTLEquivalentPostProcessor embedded in compare_postprocessing.py",
+    "execution_order": "complete baseline overlay pass, release resources, complete RTL overlay pass",
+    "timed_scope": "preprocess + DPU inference + postprocess; video decode/control/hash/output excluded",
+    "baseline": {
+      "bitstream": "/home/xilinx/jupyter_notebooks/URP_HW/auto_drive/configs/dpu/dpu.bit",
+      "bitstream_sha256": "6edef2076e9277a918c4527f4312cf4a1f08ff01b64326651cb5e2271a26eab7"
+    },
+    "rtl": {
+      "bitstream": "/home/xilinx/jupyter_notebooks/URP_HW/auto_drive_RTL/configs/dpu/dpu.bit",
+      "bitstream_sha256": "a139aadbb2b1d8749fd0e53132364e5c2424b3710b9ba15bf6d7831b9d023f23",
+      "rtl_base_address": "0x80010000",
+      "rtl_base_source": "overlay.ip_dict[postproc_top_0]"
+    },
+    "common_file_sha256": {
+      "configs/default.yaml": "366e5b3094da8be397885752dc58c6ce49a39fb6aa982b535cc75f5f80356da2",
+      "configs/camera.yaml": "c36e20f50f7f184c2d37a3cca91c92b7afecd1d83fa0fe3b5549cd2aaf00cb96",
+      "configs/model.yaml": "9747924dc7e4c857032411973b31794c044e7496bd54ab40ed13a4060c603aa5",
+      "configs/control.yaml": "fcc988bd68300e24dc2650ce7f9f935d7c9baf7a8535d97dc4f24bf7c50fe1cb",
+      "models/lane_segmentation.xmodel": "a405ad137b2b62b6ac52a62e87f04c8ec5c30cc6a67a2ec786bc34719a0bc8a3",
+      "setup.sh": "70de6443cdf2267a9a365ae806526255d2447eb8463e42e1dbf879ab332e49c0"
+    },
+    "baseline_config": {
+      "default": {
+        "debug": false,
+        "show_window": false,
+        "save_outputs": false,
+        "debug_stream": {
+          "enabled": false,
+          "port": 5556,
+          "fps": 2,
+          "quality": 40,
+          "scale": 0.5
+        },
+        "save_every_n_frames": 30,
+        "print_every_n_frames": 10,
+        "resource_log_every_n_frames": 10,
+        "max_frames": 1000,
+        "warmup_iters": 2,
+        "target_fps": 0,
+        "use_actuator": true,
+        "stop_on_invalid_mask": true,
+        "invalid_stop_frames": 10,
+        "save_runtime_log": false,
+        "save_profiling_csv": false,
+        "runtime_log_path": "logs/runtime/runtime.log",
+        "profiling_csv_path": "logs/profiling/profiling.csv",
+        "actuator": {
+          "overlay_path": "configs/dpu/dpu.bit",
+          "mmio_range": 65536,
+          "period_size": 600600,
+          "drive_duty_percent": 1.0,
+          "drive_min_duty_percent": 0.6,
+          "steering_duty_percent": 0.8,
+          "steering_min_duty_percent": 0.4,
+          "steering_center_hold_percent": 0.3,
+          "steering_feedback_control": false,
+          "steering_feedback_kp": 1.0,
+          "steering_feedback_deadband": 0.05,
+          "command_timeout_sec": 10,
+          "debug_readback": false,
+          "enable_adc": false,
+          "spi_bus": 0,
+          "spi_device": 0,
+          "spi_mode": 0,
+          "spi_max_speed_hz": 20000000,
+          "adc_right": 240,
+          "adc_left": 990,
+          "motors": {
+            "base_addrs": {
+              "rear_right_fwd": "0x00A0000000",
+              "rear_left_fwd": "0x00A0020000",
+              "rear_right_bwd": "0x00A0040000",
+              "rear_left_bwd": "0x00A0030000",
+              "steering_right": "0x00A0010000",
+              "steering_left": "0x00A0050000"
+            },
+            "drive_channels": [
+              "rear_right_fwd",
+              "rear_left_fwd"
+            ],
+            "reverse_channels": [
+              "rear_right_bwd",
+              "rear_left_bwd"
+            ],
+            "steering_right": "steering_right",
+            "steering_left": "steering_left"
+          }
+        }
+      },
+      "camera": {
+        "camera_index": 0,
+        "width": 640,
+        "height": 480,
+        "fps": 30,
+        "pixel_format": "MJPG",
+        "buffer_size": 2,
+        "roi_top_ratio": 0.0,
+        "roi_bottom_ratio": 1.0,
+        "roi_left_ratio": 0.0,
+        "roi_right_ratio": 1.0
+      },
+      "model": {
+        "xmodel_path": "models/lane_segmentation.xmodel",
+        "input_width": 256,
+        "input_height": 256,
+        "input_channels": 3,
+        "threshold": 0.0,
+        "threshold_inclusive": true,
+        "normalize": true,
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "channel_order": "RGB"
+      },
+      "control": {
+        "reference_row_ratio": 0.7,
+        "morph_kernel_size": 5,
+        "min_lane_pixels": 50,
+        "min_component_area": 0,
+        "min_centerline_points": 1,
+        "min_pixels_per_sample_row": 1,
+        "centerline_row_step": 1,
+        "kp": 0.2,
+        "ki": 0.0,
+        "kd": 0.5,
+        "base_speed": 0.25,
+        "min_speed": 0.1,
+        "max_speed": 0.35,
+        "max_steering": 1.0,
+        "min_steering": -1.0,
+        "deadband": 0.02
+      }
+    },
+    "rtl_config": {
+      "default": {
+        "debug": false,
+        "show_window": false,
+        "save_outputs": false,
+        "debug_stream": {
+          "enabled": false,
+          "port": 5556,
+          "fps": 2,
+          "quality": 40,
+          "scale": 0.5
+        },
+        "save_every_n_frames": 30,
+        "print_every_n_frames": 10,
+        "resource_log_every_n_frames": 10,
+        "max_frames": 1000,
+        "warmup_iters": 2,
+        "target_fps": 0,
+        "use_actuator": true,
+        "stop_on_invalid_mask": true,
+        "invalid_stop_frames": 10,
+        "save_runtime_log": false,
+        "save_profiling_csv": false,
+        "runtime_log_path": "logs/runtime/runtime.log",
+        "profiling_csv_path": "logs/profiling/profiling.csv",
+        "actuator": {
+          "overlay_path": "configs/dpu/dpu.bit",
+          "mmio_range": 65536,
+          "period_size": 600600,
+          "drive_duty_percent": 1.0,
+          "drive_min_duty_percent": 0.6,
+          "steering_duty_percent": 0.8,
+          "steering_min_duty_percent": 0.4,
+          "steering_center_hold_percent": 0.3,
+          "steering_feedback_control": false,
+          "steering_feedback_kp": 1.0,
+          "steering_feedback_deadband": 0.05,
+          "command_timeout_sec": 10,
+          "debug_readback": false,
+          "enable_adc": false,
+          "spi_bus": 0,
+          "spi_device": 0,
+          "spi_mode": 0,
+          "spi_max_speed_hz": 20000000,
+          "adc_right": 240,
+          "adc_left": 990,
+          "motors": {
+            "base_addrs": {
+              "rear_right_fwd": "0x00A0000000",
+              "rear_left_fwd": "0x00A0020000",
+              "rear_right_bwd": "0x00A0040000",
+              "rear_left_bwd": "0x00A0030000",
+              "steering_right": "0x00A0010000",
+              "steering_left": "0x00A0050000"
+            },
+            "drive_channels": [
+              "rear_right_fwd",
+              "rear_left_fwd"
+            ],
+            "reverse_channels": [
+              "rear_right_bwd",
+              "rear_left_bwd"
+            ],
+            "steering_right": "steering_right",
+            "steering_left": "steering_left"
+          }
+        }
+      },
+      "camera": {
+        "camera_index": 0,
+        "width": 640,
+        "height": 480,
+        "fps": 30,
+        "pixel_format": "MJPG",
+        "buffer_size": 2,
+        "roi_top_ratio": 0.0,
+        "roi_bottom_ratio": 1.0,
+        "roi_left_ratio": 0.0,
+        "roi_right_ratio": 1.0
+      },
+      "model": {
+        "xmodel_path": "models/lane_segmentation.xmodel",
+        "input_width": 256,
+        "input_height": 256,
+        "input_channels": 3,
+        "threshold": 0.0,
+        "threshold_inclusive": true,
+        "normalize": true,
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "channel_order": "RGB"
+      },
+      "control": {
+        "reference_row_ratio": 0.7,
+        "morph_kernel_size": 5,
+        "min_lane_pixels": 50,
+        "min_component_area": 0,
+        "min_centerline_points": 1,
+        "min_pixels_per_sample_row": 1,
+        "centerline_row_step": 1,
+        "kp": 0.2,
+        "ki": 0.0,
+        "kd": 0.5,
+        "base_speed": 0.25,
+        "min_speed": 0.1,
+        "max_speed": 0.35,
+        "max_steering": 1.0,
+        "min_steering": -1.0,
+        "deadband": 0.02
+      }
+    },
+    "python": "3.10.4 (main, Apr  2 2022, 09:04:19) [GCC 11.2.0]",
+    "opencv": "4.5.4",
+    "numpy": "1.21.5"
+  }
+}

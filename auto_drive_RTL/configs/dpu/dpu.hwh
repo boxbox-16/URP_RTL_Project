@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
-<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Sat Sep  5 23:42:26 2026" VIVADOVERSION="2022.1">
+<EDKSYSTEM EDWVERSION="1.2" TIMESTAMP="Mon Sep  7 12:09:46 2026" VIVADOVERSION="2022.1">
 
   <SYSTEMINFO ARCH="zynquplus" BOARD="avnet.com:ultra96v2:part0:1.2" DEVICE="xczu3eg" NAME="design_1" PACKAGE="sbva484" SPEEDGRADE="-1"/>
 
@@ -5967,9 +5967,9 @@
         <PARAMETER NAME="C_HIGHADDR" VALUE="0x8000FFFF"/>
       </PARAMETERS>
       <PORTS>
-        <PORT CLKFREQUENCY="75000000" DIR="I" NAME="s_axi_aclk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT CLKFREQUENCY="150000000" DIR="I" NAME="s_axi_aclk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="s_axi_aresetn" POLARITY="ACTIVE_LOW" SIGIS="rst" SIGNAME="proc_sys_reset_2_interconnect_aresetn">
@@ -6077,7 +6077,7 @@
         <BUSINTERFACE BUSNAME="interconnect_axilite_M00_AXI" DATAWIDTH="32" NAME="s_axi" TYPE="SLAVE" VLNV="xilinx.com:interface:aximm:1.0">
           <PARAMETER NAME="DATA_WIDTH" VALUE="32"/>
           <PARAMETER NAME="PROTOCOL" VALUE="AXI4LITE"/>
-          <PARAMETER NAME="FREQ_HZ" VALUE="75000000"/>
+          <PARAMETER NAME="FREQ_HZ" VALUE="150000000"/>
           <PARAMETER NAME="ID_WIDTH" VALUE="0"/>
           <PARAMETER NAME="ADDR_WIDTH" VALUE="9"/>
           <PARAMETER NAME="AWUSER_WIDTH" VALUE="0"/>
@@ -6766,9 +6766,9 @@
             <CONNECTION INSTANCE="proc_sys_reset_1" PORT="interconnect_aresetn"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="S00_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT DIR="I" NAME="S00_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="S00_ARESETN" SIGIS="rst" SIGNAME="proc_sys_reset_2_interconnect_aresetn">
@@ -9741,6 +9741,15 @@
           <CONNECTIONS>
             <CONNECTION INSTANCE="proc_sys_reset_0" PORT="slowest_sync_clk"/>
             <CONNECTION INSTANCE="ps_e" PORT="maxihpm1_fpd_aclk"/>
+            <CONNECTION INSTANCE="postproc_top_0" PORT="aclk"/>
+            <CONNECTION INSTANCE="proc_sys_reset_2" PORT="slowest_sync_clk"/>
+            <CONNECTION INSTANCE="axi_intc_0" PORT="s_axi_aclk"/>
+            <CONNECTION INSTANCE="ps_e" PORT="maxihpm0_lpd_aclk"/>
+            <CONNECTION INSTANCE="interconnect_axilite" PORT="ACLK"/>
+            <CONNECTION INSTANCE="interconnect_axilite" PORT="S00_ACLK"/>
+            <CONNECTION INSTANCE="interconnect_axilite" PORT="M00_ACLK"/>
+            <CONNECTION INSTANCE="interconnect_axilite" PORT="M01_ACLK"/>
+            <CONNECTION INSTANCE="axi_interconnect_0" PORT="S00_ACLK"/>
             <CONNECTION INSTANCE="axi_ic_ps_e_M_AXI_HPM1_FPD" PORT="S00_ACLK"/>
             <CONNECTION INSTANCE="axi_ic_ps_e_M_AXI_HPM1_FPD" PORT="ACLK"/>
           </CONNECTIONS>
@@ -9781,19 +9790,7 @@
             <CONNECTION INSTANCE="axi_interconnect_0" PORT="M00_ACLK"/>
           </CONNECTIONS>
         </PORT>
-        <PORT CLKFREQUENCY="75000000" DIR="O" NAME="clk_out3" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
-          <CONNECTIONS>
-            <CONNECTION INSTANCE="axi_intc_0" PORT="s_axi_aclk"/>
-            <CONNECTION INSTANCE="proc_sys_reset_2" PORT="slowest_sync_clk"/>
-            <CONNECTION INSTANCE="ps_e" PORT="maxihpm0_lpd_aclk"/>
-            <CONNECTION INSTANCE="postproc_top_0" PORT="aclk"/>
-            <CONNECTION INSTANCE="interconnect_axilite" PORT="ACLK"/>
-            <CONNECTION INSTANCE="interconnect_axilite" PORT="S00_ACLK"/>
-            <CONNECTION INSTANCE="interconnect_axilite" PORT="M00_ACLK"/>
-            <CONNECTION INSTANCE="interconnect_axilite" PORT="M01_ACLK"/>
-            <CONNECTION INSTANCE="axi_interconnect_0" PORT="S00_ACLK"/>
-          </CONNECTIONS>
-        </PORT>
+        <PORT CLKFREQUENCY="75000000" DIR="O" NAME="clk_out3" SIGIS="clk"/>
         <PORT CLKFREQUENCY="100000000" DIR="O" NAME="clk_out4" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out4">
           <CONNECTIONS>
             <CONNECTION INSTANCE="proc_sys_reset_3" PORT="slowest_sync_clk"/>
@@ -12833,9 +12830,9 @@
         <PARAMETER NAME="EDK_IPTYPE" VALUE="BUS"/>
       </PARAMETERS>
       <PORTS>
-        <PORT DIR="I" NAME="ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT DIR="I" NAME="ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="ARESETN" SIGIS="rst" SIGNAME="proc_sys_reset_2_interconnect_aresetn">
@@ -12843,9 +12840,9 @@
             <CONNECTION INSTANCE="proc_sys_reset_2" PORT="interconnect_aresetn"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="S00_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT DIR="I" NAME="S00_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="S00_ARESETN" SIGIS="rst" SIGNAME="proc_sys_reset_2_interconnect_aresetn">
@@ -12853,9 +12850,9 @@
             <CONNECTION INSTANCE="proc_sys_reset_2" PORT="interconnect_aresetn"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="M00_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT DIR="I" NAME="M00_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="M00_ARESETN" SIGIS="rst" SIGNAME="proc_sys_reset_2_interconnect_aresetn">
@@ -12863,9 +12860,9 @@
             <CONNECTION INSTANCE="proc_sys_reset_2" PORT="interconnect_aresetn"/>
           </CONNECTIONS>
         </PORT>
-        <PORT DIR="I" NAME="M01_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT DIR="I" NAME="M01_ACLK" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="M01_ARESETN" SIGIS="rst" SIGNAME="proc_sys_reset_2_peripheral_aresetn">
@@ -13446,9 +13443,9 @@
         <PARAMETER NAME="C_HIGHADDR" VALUE="0x80010FFF"/>
       </PARAMETERS>
       <PORTS>
-        <PORT CLKFREQUENCY="75000000" DIR="I" NAME="aclk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT CLKFREQUENCY="150000000" DIR="I" NAME="aclk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="aresetn" POLARITY="ACTIVE_LOW" SIGIS="rst" SIGNAME="proc_sys_reset_2_peripheral_aresetn">
@@ -13596,7 +13593,7 @@
         <BUSINTERFACE BUSNAME="postproc_top_0_m" DATAWIDTH="128" NAME="m" TYPE="MASTER" VLNV="xilinx.com:interface:aximm:1.0">
           <PARAMETER NAME="DATA_WIDTH" VALUE="128"/>
           <PARAMETER NAME="PROTOCOL" VALUE="AXI4"/>
-          <PARAMETER NAME="FREQ_HZ" VALUE="75000000"/>
+          <PARAMETER NAME="FREQ_HZ" VALUE="150000000"/>
           <PARAMETER NAME="ID_WIDTH" VALUE="0"/>
           <PARAMETER NAME="ADDR_WIDTH" VALUE="40"/>
           <PARAMETER NAME="AWUSER_WIDTH" VALUE="0"/>
@@ -13641,7 +13638,7 @@
         <BUSINTERFACE BUSNAME="interconnect_axilite_M01_AXI" DATAWIDTH="32" NAME="s" TYPE="SLAVE" VLNV="xilinx.com:interface:aximm:1.0">
           <PARAMETER NAME="DATA_WIDTH" VALUE="32"/>
           <PARAMETER NAME="PROTOCOL" VALUE="AXI4LITE"/>
-          <PARAMETER NAME="FREQ_HZ" VALUE="75000000"/>
+          <PARAMETER NAME="FREQ_HZ" VALUE="150000000"/>
           <PARAMETER NAME="ID_WIDTH" VALUE="0"/>
           <PARAMETER NAME="ADDR_WIDTH" VALUE="6"/>
           <PARAMETER NAME="AWUSER_WIDTH" VALUE="0"/>
@@ -13848,9 +13845,9 @@
         <PARAMETER NAME="EDK_IPTYPE" VALUE="PERIPHERAL"/>
       </PARAMETERS>
       <PORTS>
-        <PORT CLKFREQUENCY="75000000" DIR="I" NAME="slowest_sync_clk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT CLKFREQUENCY="150000000" DIR="I" NAME="slowest_sync_clk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="I" NAME="ext_reset_in" POLARITY="ACTIVE_LOW" SIGIS="rst" SIGNAME="ps_e_pl_resetn0">
@@ -15840,7 +15837,7 @@
         <PARAMETER NAME="PSU__ENABLE__DDR__REFRESH__SIGNALS" VALUE="0"/>
         <PARAMETER NAME="PSU__M_AXI_GP0__FREQMHZ" VALUE="300.0"/>
         <PARAMETER NAME="PSU__M_AXI_GP1__FREQMHZ" VALUE="150.0"/>
-        <PARAMETER NAME="PSU__M_AXI_GP2__FREQMHZ" VALUE="75.0"/>
+        <PARAMETER NAME="PSU__M_AXI_GP2__FREQMHZ" VALUE="150.0"/>
         <PARAMETER NAME="PSU__S_AXI_GP0__FREQMHZ" VALUE="300.0"/>
         <PARAMETER NAME="PSU__S_AXI_GP1__FREQMHZ" VALUE="10"/>
         <PARAMETER NAME="PSU__S_AXI_GP2__FREQMHZ" VALUE="300.0"/>
@@ -16255,9 +16252,9 @@
             <CONNECTION INSTANCE="axi_ic_ps_e_M_AXI_HPM1_FPD" PORT="S00_AXI_arqos"/>
           </CONNECTIONS>
         </PORT>
-        <PORT CLKFREQUENCY="75000000" DIR="I" NAME="maxihpm0_lpd_aclk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out3">
+        <PORT CLKFREQUENCY="150000000" DIR="I" NAME="maxihpm0_lpd_aclk" SIGIS="clk" SIGNAME="clk_wiz_0_clk_out1">
           <CONNECTIONS>
-            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out3"/>
+            <CONNECTION INSTANCE="clk_wiz_0" PORT="clk_out1"/>
           </CONNECTIONS>
         </PORT>
         <PORT DIR="O" LEFT="15" NAME="maxigp2_awid" RIGHT="0" SIGIS="undef" SIGNAME="interconnect_axilite_S00_AXI_awid">
@@ -17472,7 +17469,7 @@
           <PARAMETER NAME="NUM_READ_OUTSTANDING" VALUE="8"/>
           <PARAMETER NAME="DATA_WIDTH" VALUE="32"/>
           <PARAMETER NAME="PROTOCOL" VALUE="AXI4"/>
-          <PARAMETER NAME="FREQ_HZ" VALUE="75000000"/>
+          <PARAMETER NAME="FREQ_HZ" VALUE="150000000"/>
           <PARAMETER NAME="ID_WIDTH" VALUE="16"/>
           <PARAMETER NAME="ADDR_WIDTH" VALUE="40"/>
           <PARAMETER NAME="AWUSER_WIDTH" VALUE="16"/>

@@ -1,0 +1,386 @@
+{
+  "frames": 5,
+  "timing_ms": {
+    "preprocess_ms": {
+      "baseline": {
+        "mean": 6.2980756,
+        "median": 6.088762,
+        "p95": 7.703644,
+        "std": 0.7287092069665648,
+        "min": 5.585931,
+        "max": 7.703644
+      },
+      "rtl": {
+        "mean": 6.2788348,
+        "median": 5.941808,
+        "p95": 7.996049,
+        "std": 0.872591229716962,
+        "min": 5.55201,
+        "max": 7.996049
+      },
+      "mean_relative_difference_pct": 0.3059702166598802,
+      "speedup_baseline_over_rtl": 1.0030643902273078
+    },
+    "inference_ms": {
+      "baseline": {
+        "mean": 14.7250362,
+        "median": 14.671773,
+        "p95": 15.336167,
+        "std": 0.32450161866184873,
+        "min": 14.395037,
+        "max": 15.336167
+      },
+      "rtl": {
+        "mean": 14.859009,
+        "median": 14.901496,
+        "p95": 15.215382,
+        "std": 0.3103892632369879,
+        "min": 14.498668,
+        "max": 15.215382
+      },
+      "mean_relative_difference_pct": 0.9057098114493176,
+      "speedup_baseline_over_rtl": 0.9909837324952155
+    },
+    "postprocess_ms": {
+      "baseline": {
+        "mean": 2.9061678,
+        "median": 2.899718,
+        "p95": 2.946619,
+        "std": 0.033379072074579935,
+        "min": 2.866587,
+        "max": 2.946619
+      },
+      "rtl": {
+        "mean": 0.8647814,
+        "median": 0.872688,
+        "p95": 0.873757,
+        "std": 0.010518091701444713,
+        "min": 0.848197,
+        "max": 0.873757
+      },
+      "mean_relative_difference_pct": 108.26910105285958,
+      "speedup_baseline_over_rtl": 3.360580835804285
+    },
+    "pipeline_ms": {
+      "baseline": {
+        "mean": 23.977987000000002,
+        "median": 23.752644,
+        "p95": 25.220714,
+        "std": 0.7728077087824631,
+        "min": 22.897617,
+        "max": 25.220714
+      },
+      "rtl": {
+        "mean": 22.0467718,
+        "median": 21.720931,
+        "p95": 23.419855,
+        "std": 0.7154368892444389,
+        "min": 21.405685,
+        "max": 23.419855
+      },
+      "mean_relative_difference_pct": 8.39207092161884,
+      "speedup_baseline_over_rtl": 1.0875962801955434
+    }
+  },
+  "steering": {
+    "tolerance": 0.0,
+    "error_mae": 0.0,
+    "error_rmse": 0.0,
+    "error_max_abs": 0.0,
+    "error_p95_abs": 0.0,
+    "error_correlation": null,
+    "error_within_tolerance_ratio": 1.0,
+    "direction_agreement_ratio": 1.0,
+    "command_mae": 0.0,
+    "command_max_abs": 0.0,
+    "valid_agreement_ratio": 1.0,
+    "lane_pixels_mae": 0.0,
+    "lane_pixels_max_abs": 0,
+    "lane_pixels_exact_ratio": 1.0,
+    "baseline_valid_ratio": 1.0,
+    "rtl_valid_ratio": 1.0
+  },
+  "criteria": {
+    "stage_mean_similarity_tolerance_pct": 10.0,
+    "preprocess_timing_similar": true,
+    "inference_timing_similar": true,
+    "rtl_postprocess_faster": true,
+    "steering_mae_within_tolerance": true,
+    "steering_p95_within_tolerance": true,
+    "lane_pixels_exact": true,
+    "valid_exact": true,
+    "all_pass": true
+  },
+  "metadata": {
+    "created_utc": "2026-09-07T05:01:22.567733+00:00",
+    "video": "/home/xilinx/jupyter_notebooks/URP_HW/test_video.mp4",
+    "video_sha256": "cec954a516545fb21bfc2d6f010d258137e7cb7314744bfbaba831d8e654ecf1",
+    "video_fps": 30.0,
+    "video_total_frames": 2949,
+    "skip_frames": 0,
+    "warmup_iterations_per_overlay": 2,
+    "common_stage_value_check": "all 5 frame preprocess/DPU int8 SHA-256 matched",
+    "software_postprocess_spec": "RTLEquivalentPostProcessor embedded in compare_postprocessing.py",
+    "execution_order": "complete baseline overlay pass, release resources, complete RTL overlay pass",
+    "timed_scope": "preprocess + DPU inference + postprocess; video decode/control/hash/output excluded",
+    "baseline": {
+      "bitstream": "/home/xilinx/jupyter_notebooks/URP_HW/auto_drive/configs/dpu/dpu.bit",
+      "bitstream_sha256": "6edef2076e9277a918c4527f4312cf4a1f08ff01b64326651cb5e2271a26eab7"
+    },
+    "rtl": {
+      "bitstream": "/home/xilinx/jupyter_notebooks/URP_HW/auto_drive_RTL/configs/dpu/dpu.bit",
+      "bitstream_sha256": "a139aadbb2b1d8749fd0e53132364e5c2424b3710b9ba15bf6d7831b9d023f23",
+      "rtl_base_address": "0x80010000",
+      "rtl_base_source": "overlay.ip_dict[postproc_top_0]"
+    },
+    "common_file_sha256": {
+      "configs/default.yaml": "366e5b3094da8be397885752dc58c6ce49a39fb6aa982b535cc75f5f80356da2",
+      "configs/camera.yaml": "c36e20f50f7f184c2d37a3cca91c92b7afecd1d83fa0fe3b5549cd2aaf00cb96",
+      "configs/model.yaml": "9747924dc7e4c857032411973b31794c044e7496bd54ab40ed13a4060c603aa5",
+      "configs/control.yaml": "fcc988bd68300e24dc2650ce7f9f935d7c9baf7a8535d97dc4f24bf7c50fe1cb",
+      "models/lane_segmentation.xmodel": "a405ad137b2b62b6ac52a62e87f04c8ec5c30cc6a67a2ec786bc34719a0bc8a3",
+      "setup.sh": "70de6443cdf2267a9a365ae806526255d2447eb8463e42e1dbf879ab332e49c0"
+    },
+    "baseline_config": {
+      "default": {
+        "debug": false,
+        "show_window": false,
+        "save_outputs": false,
+        "debug_stream": {
+          "enabled": false,
+          "port": 5556,
+          "fps": 2,
+          "quality": 40,
+          "scale": 0.5
+        },
+        "save_every_n_frames": 30,
+        "print_every_n_frames": 10,
+        "resource_log_every_n_frames": 10,
+        "max_frames": 1000,
+        "warmup_iters": 2,
+        "target_fps": 0,
+        "use_actuator": true,
+        "stop_on_invalid_mask": true,
+        "invalid_stop_frames": 10,
+        "save_runtime_log": false,
+        "save_profiling_csv": false,
+        "runtime_log_path": "logs/runtime/runtime.log",
+        "profiling_csv_path": "logs/profiling/profiling.csv",
+        "actuator": {
+          "overlay_path": "configs/dpu/dpu.bit",
+          "mmio_range": 65536,
+          "period_size": 600600,
+          "drive_duty_percent": 1.0,
+          "drive_min_duty_percent": 0.6,
+          "steering_duty_percent": 0.8,
+          "steering_min_duty_percent": 0.4,
+          "steering_center_hold_percent": 0.3,
+          "steering_feedback_control": false,
+          "steering_feedback_kp": 1.0,
+          "steering_feedback_deadband": 0.05,
+          "command_timeout_sec": 10,
+          "debug_readback": false,
+          "enable_adc": false,
+          "spi_bus": 0,
+          "spi_device": 0,
+          "spi_mode": 0,
+          "spi_max_speed_hz": 20000000,
+          "adc_right": 240,
+          "adc_left": 990,
+          "motors": {
+            "base_addrs": {
+              "rear_right_fwd": "0x00A0000000",
+              "rear_left_fwd": "0x00A0020000",
+              "rear_right_bwd": "0x00A0040000",
+              "rear_left_bwd": "0x00A0030000",
+              "steering_right": "0x00A0010000",
+              "steering_left": "0x00A0050000"
+            },
+            "drive_channels": [
+              "rear_right_fwd",
+              "rear_left_fwd"
+            ],
+            "reverse_channels": [
+              "rear_right_bwd",
+              "rear_left_bwd"
+            ],
+            "steering_right": "steering_right",
+            "steering_left": "steering_left"
+          }
+        }
+      },
+      "camera": {
+        "camera_index": 0,
+        "width": 640,
+        "height": 480,
+        "fps": 30,
+        "pixel_format": "MJPG",
+        "buffer_size": 2,
+        "roi_top_ratio": 0.0,
+        "roi_bottom_ratio": 1.0,
+        "roi_left_ratio": 0.0,
+        "roi_right_ratio": 1.0
+      },
+      "model": {
+        "xmodel_path": "models/lane_segmentation.xmodel",
+        "input_width": 256,
+        "input_height": 256,
+        "input_channels": 3,
+        "threshold": 0.0,
+        "threshold_inclusive": true,
+        "normalize": true,
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "channel_order": "RGB"
+      },
+      "control": {
+        "reference_row_ratio": 0.7,
+        "morph_kernel_size": 5,
+        "min_lane_pixels": 50,
+        "min_component_area": 0,
+        "min_centerline_points": 1,
+        "min_pixels_per_sample_row": 1,
+        "centerline_row_step": 1,
+        "kp": 0.2,
+        "ki": 0.0,
+        "kd": 0.5,
+        "base_speed": 0.25,
+        "min_speed": 0.1,
+        "max_speed": 0.35,
+        "max_steering": 1.0,
+        "min_steering": -1.0,
+        "deadband": 0.02
+      }
+    },
+    "rtl_config": {
+      "default": {
+        "debug": false,
+        "show_window": false,
+        "save_outputs": false,
+        "debug_stream": {
+          "enabled": false,
+          "port": 5556,
+          "fps": 2,
+          "quality": 40,
+          "scale": 0.5
+        },
+        "save_every_n_frames": 30,
+        "print_every_n_frames": 10,
+        "resource_log_every_n_frames": 10,
+        "max_frames": 1000,
+        "warmup_iters": 2,
+        "target_fps": 0,
+        "use_actuator": true,
+        "stop_on_invalid_mask": true,
+        "invalid_stop_frames": 10,
+        "save_runtime_log": false,
+        "save_profiling_csv": false,
+        "runtime_log_path": "logs/runtime/runtime.log",
+        "profiling_csv_path": "logs/profiling/profiling.csv",
+        "actuator": {
+          "overlay_path": "configs/dpu/dpu.bit",
+          "mmio_range": 65536,
+          "period_size": 600600,
+          "drive_duty_percent": 1.0,
+          "drive_min_duty_percent": 0.6,
+          "steering_duty_percent": 0.8,
+          "steering_min_duty_percent": 0.4,
+          "steering_center_hold_percent": 0.3,
+          "steering_feedback_control": false,
+          "steering_feedback_kp": 1.0,
+          "steering_feedback_deadband": 0.05,
+          "command_timeout_sec": 10,
+          "debug_readback": false,
+          "enable_adc": false,
+          "spi_bus": 0,
+          "spi_device": 0,
+          "spi_mode": 0,
+          "spi_max_speed_hz": 20000000,
+          "adc_right": 240,
+          "adc_left": 990,
+          "motors": {
+            "base_addrs": {
+              "rear_right_fwd": "0x00A0000000",
+              "rear_left_fwd": "0x00A0020000",
+              "rear_right_bwd": "0x00A0040000",
+              "rear_left_bwd": "0x00A0030000",
+              "steering_right": "0x00A0010000",
+              "steering_left": "0x00A0050000"
+            },
+            "drive_channels": [
+              "rear_right_fwd",
+              "rear_left_fwd"
+            ],
+            "reverse_channels": [
+              "rear_right_bwd",
+              "rear_left_bwd"
+            ],
+            "steering_right": "steering_right",
+            "steering_left": "steering_left"
+          }
+        }
+      },
+      "camera": {
+        "camera_index": 0,
+        "width": 640,
+        "height": 480,
+        "fps": 30,
+        "pixel_format": "MJPG",
+        "buffer_size": 2,
+        "roi_top_ratio": 0.0,
+        "roi_bottom_ratio": 1.0,
+        "roi_left_ratio": 0.0,
+        "roi_right_ratio": 1.0
+      },
+      "model": {
+        "xmodel_path": "models/lane_segmentation.xmodel",
+        "input_width": 256,
+        "input_height": 256,
+        "input_channels": 3,
+        "threshold": 0.0,
+        "threshold_inclusive": true,
+        "normalize": true,
+        "mean": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "std": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "channel_order": "RGB"
+      },
+      "control": {
+        "reference_row_ratio": 0.7,
+        "morph_kernel_size": 5,
+        "min_lane_pixels": 50,
+        "min_component_area": 0,
+        "min_centerline_points": 1,
+        "min_pixels_per_sample_row": 1,
+        "centerline_row_step": 1,
+        "kp": 0.2,
+        "ki": 0.0,
+        "kd": 0.5,
+        "base_speed": 0.25,
+        "min_speed": 0.1,
+        "max_speed": 0.35,
+        "max_steering": 1.0,
+        "min_steering": -1.0,
+        "deadband": 0.02
+      }
+    },
+    "python": "3.10.4 (main, Apr  2 2022, 09:04:19) [GCC 11.2.0]",
+    "opencv": "4.5.4",
+    "numpy": "1.21.5"
+  }
+}

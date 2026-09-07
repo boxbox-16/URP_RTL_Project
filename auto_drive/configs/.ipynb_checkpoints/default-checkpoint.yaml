@@ -20,7 +20,7 @@ resource_log_every_n_frames: 10
 # 2. 실행 루프 제어
 max_frames: 1000  # 0 이하면 Ctrl+C 전까지 계속 실행
 warmup_iters: 2
-target_fps: 30  # 메인 루프 최대 FPS 제한 (0 = 제한 없음). DPU 추론이 충분히 느리면 sleep은 건너뜀.
+target_fps: 0  # 메인 루프 최대 FPS 제한 (0 = 제한 없음). 실측 처리 속도 ~20fps 기준.
 use_actuator: true  # 실전 테스트 시 반드시 true 확인
 stop_on_invalid_mask: true
 invalid_stop_frames: 10
@@ -33,12 +33,17 @@ profiling_csv_path: logs/profiling/profiling.csv
 
 # 4. 액추에이터 및 하드웨어 세부 설정
 actuator:
-  overlay_path: configs/dpu/dpu.bit  # DPU+PWM 통합 bitstream (6채널 PWM 포함)
+  # 두 실주행 노트북이 사용하는 공통 DPU+PWM+postproc 합성본
+  overlay_path: ../auto_drive/configs/dpu/dpu.bit
   mmio_range: 65536
-  # [노트북 성공값] 300MHz FPGA 클럭 기준 (DPU bitstream: clk_wiz_0 clk_out2 = 300MHz)
-  # 100MHz 기준: 200000, 300MHz 기준: 600600 (500Hz PWM)
+  # PWM IP 클럭: clk_wiz_0 clk_out2 = 300MHz (Vivado 수정 후 구 bitstream과 동일)
+  # 300MHz 기준: 600600 (500Hz PWM)
   period_size: 600600
   drive_duty_percent: 1.0    # controller speed_cmd와 곱해짐. speed 0.25 기준 약 25% duty
+  # DC 구동 모터 최소 기동 듀티 (0.0 = 기존 비례 방식 / 0.6 권장)
+  # duty = period × drive_duty_percent × (drive_min + (1-drive_min) × |speed_cmd|)
+  # 예: min=0.6이면 duty 범위 60%~100% → 12V DC 구동 모터 정지마찰 극복 보장
+  drive_min_duty_percent: 0.6
   steering_duty_percent: 0.80 # 10.0 -> 0.8
   # DC 모터 최소 기동 듀티 (0.0 = 기존 비례 방식, 0.6 권장)
   # effort > deadband 일 때 duty = period × (min + (1-min) × |effort|)
@@ -63,13 +68,13 @@ actuator:
   adc_left: 990  # 노트북 실측 좌측 끝값
 
   # 5. 모터 주소 및 채널 맵핑 (dpu.bit hwh 실측 기준)
-  # dpu.bit AXI주소 → PWM_out 핀 매핑 (hwh 확인):
-  #   0xA0000000 → PWM_out_0 → rear_right_fwd
-  #   0xA0010000 → PWM_out_4 → steering_right
-  #   0xA0020000 → PWM_out_3 → rear_left_fwd
-  #   0xA0030000 → PWM_out_2 → rear_left_bwd
-  #   0xA0040000 → PWM_out_1 → rear_right_bwd
-  #   0xA0050000 → PWM_out_5 → steering_left
+  # Vivado 수정 후 구 bitstream과 동일: AXI 주소 → PWM_IP_n → PWM_out_m (셔플 매핑)
+  #   0xA0000000 → PWM_IP_0 → PWM_out_0 → rear_right_fwd
+  #   0xA0010000 → PWM_IP_1 → PWM_out_4 → steering_right
+  #   0xA0020000 → PWM_IP_2 → PWM_out_3 → rear_left_fwd
+  #   0xA0030000 → PWM_IP_3 → PWM_out_2 → rear_left_bwd
+  #   0xA0040000 → PWM_IP_4 → PWM_out_1 → rear_right_bwd
+  #   0xA0050000 → PWM_IP_5 → PWM_out_5 → steering_left
   motors:
     base_addrs:
       # 뒷바퀴 전진 채널 (Forward)

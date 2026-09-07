@@ -33,7 +33,7 @@ profiling_csv_path: logs/profiling/profiling.csv
 
 # 4. 액추에이터 및 하드웨어 세부 설정
 actuator:
-  overlay_path: configs/dpu/dpu.bit  # DPU+PWM 통합 bitstream (6채널 PWM 포함)
+  overlay_path: configs/dpu/dpu.bit  # 각 파이프라인 폴더의 로컬 bitstream
   mmio_range: 65536
   # PWM IP 클럭: clk_wiz_0 clk_out2 = 300MHz (Vivado 수정 후 구 bitstream과 동일)
   # 300MHz 기준: 600600 (500Hz PWM)

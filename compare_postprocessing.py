@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """같은 영상에서 RTL-equivalent CPU 후처리와 실제 RTL 후처리를 비교한다.
 
-RTL 오버레이를 한 번만 로드한 뒤 각 프레임을 두 경로에서 각각 전처리하고
-DPU 추론한다. 두 경로의 실행 순서는 프레임마다 바꿔 순서에 따른 캐시/온도
-편향을 줄인다. 영상 디코딩, 제어기 계산, 파일 출력은 단계별 시간에서 제외된다.
+먼저 auto_drive 설정의 비트스트림으로 소프트웨어 파이프라인을 측정하고 자원을
+해제한다. 그 다음 auto_drive_RTL 설정의 비트스트림을 로드해 RTL 파이프라인을
+측정한다. 두 단계는 같은 영상을 처음부터 다시 읽고 프레임별 전처리/DPU 출력
+해시를 대조한다. 영상 디코딩, 제어기 계산, 파일 출력은 단계별 시간에서 제외된다.
 
 기본 사용법:
     python3 compare_postprocessing.py
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gc
 import hashlib
 import json
 import math
@@ -39,8 +41,6 @@ import cv2
 import numpy as np
 import yaml
 
-from auto_drive.postprocessing import RTLEquivalentPostProcessor
-
 
 ROOT = Path(__file__).resolve().parent
 BASE_DIR = ROOT / "auto_drive"
@@ -56,6 +56,88 @@ PP_RESULT_ERR = 0x08
 PP_RESULT_VLD = 0x0C
 PP_RESULT_PX = 0x10
 PP_ADDR_HI = 0x18
+
+
+class RTLEquivalentPostProcessor:
+    """현재 ``postproc_top`` RTL의 CPU golden model.
+
+    비교 기준을 한 파일에 고정하기 위해 이 구현은 실주행 노트북과 분리한다.
+    입력은 256x256 DPU 출력이며 RTL과 같이 0을 포함한 비음수 값을 차선으로
+    판정하고 5x5 morphology 네 pass 뒤 Q1.15 조향값을 계산한다.
+    """
+
+    def __init__(self, model_cfg: dict[str, Any], control_cfg: dict[str, Any]):
+        self.height = int(model_cfg["input_height"])
+        self.width = int(model_cfg["input_width"])
+        self.threshold = float(model_cfg["threshold"])
+        self.threshold_inclusive = bool(model_cfg.get("threshold_inclusive", False))
+        kernel_size = int(control_cfg["morph_kernel_size"])
+        if (self.height, self.width) != (256, 256):
+            raise ValueError("현재 postproc_top은 256x256 출력만 지원합니다")
+        if self.threshold != 0.0 or not self.threshold_inclusive:
+            raise ValueError("현재 postproc_top은 0을 포함한 비음수 값을 차선으로 판정합니다")
+        if kernel_size != 5:
+            raise ValueError("현재 postproc_top의 morphology kernel은 5x5로 고정되어 있습니다")
+
+        self.target_row = int(self.height * float(control_cfg["reference_row_ratio"]))
+        self.min_lane_pixels = int(control_cfg.get("min_lane_pixels", 1))
+        self.kernel = np.ones((kernel_size, kernel_size), dtype=np.uint8)
+        self.binary = np.empty((self.height, self.width), dtype=np.bool_)
+        self.mask = np.empty((self.height, self.width), dtype=np.uint8)
+        self.stage_a = np.empty_like(self.mask)
+        self.stage_b = np.empty_like(self.mask)
+
+    @staticmethod
+    def _as_2d(raw_output: np.ndarray) -> np.ndarray:
+        arr = raw_output
+        if arr.ndim == 4 and arr.shape[0] == 1:
+            arr = arr[0]
+        if arr.ndim == 3 and arr.shape[-1] == 1:
+            arr = arr[..., 0]
+        elif arr.ndim == 3 and arr.shape[0] == 1:
+            arr = arr[0]
+        if arr.ndim != 2:
+            raise RuntimeError(f"지원하지 않는 DPU output shape: {raw_output.shape}")
+        return arr
+
+    def run(self, raw_output: np.ndarray) -> dict[str, Any]:
+        arr = self._as_2d(raw_output)
+        if arr.shape != (self.height, self.width):
+            raise RuntimeError(
+                f"DPU output 크기 불일치: {arr.shape} != {(self.height, self.width)}"
+            )
+
+        np.greater_equal(arr, self.threshold, out=self.binary)
+        np.copyto(self.mask, self.binary, casting="unsafe")
+        border = {"borderType": cv2.BORDER_CONSTANT, "borderValue": 0}
+        cv2.erode(self.mask, self.kernel, dst=self.stage_a, **border)
+        cv2.dilate(self.stage_a, self.kernel, dst=self.stage_b, **border)
+        cv2.dilate(self.stage_b, self.kernel, dst=self.stage_a, **border)
+        cv2.erode(self.stage_a, self.kernel, dst=self.stage_b, **border)
+
+        lane_pixels = min(int(np.count_nonzero(self.stage_b)), 0xFFFF)
+        row_counts = np.count_nonzero(self.stage_b, axis=1)
+        valid_rows = np.flatnonzero(row_counts)
+        hardware_valid = bool(valid_rows.size)
+        ref_x: int | None = None
+        ref_y: int | None = None
+        if hardware_valid:
+            distances = np.abs(valid_rows - self.target_row)
+            ref_y = int(valid_rows[int(np.argmin(distances))])
+            xs = np.flatnonzero(self.stage_b[ref_y])
+            ref_x = int(xs.sum(dtype=np.int64) // xs.size)
+
+        raw_error_q15 = 0 if ref_x is None else (ref_x - self.width // 2) << 8
+        valid = hardware_valid and lane_pixels >= self.min_lane_pixels
+        return {
+            "steering_error": float(raw_error_q15 / 32768.0),
+            "heading_error": 0.0,
+            "lane_pixels": lane_pixels,
+            "valid": valid,
+            "hardware_valid": hardware_valid,
+            "reference_point": (ref_x, ref_y),
+            "raw_error_q15": raw_error_q15,
+        }
 
 
 def now_ns() -> int:
@@ -88,7 +170,6 @@ def verify_common_inputs() -> dict[str, str]:
     paths = [
         *(Path("configs") / name for name in CONFIG_NAMES),
         Path("models/lane_segmentation.xmodel"),
-        Path("postprocessing.py"),
         Path("setup.sh"),
     ]
     mismatches: list[str] = []
@@ -112,12 +193,12 @@ def verify_common_inputs() -> dict[str, str]:
     return checked
 
 
-def load_config() -> dict[str, dict[str, Any]]:
+def load_config(pipeline_dir: Path) -> dict[str, dict[str, Any]]:
     return {
-        "default": load_yaml(BASE_DIR / "configs/default.yaml"),
-        "camera": load_yaml(BASE_DIR / "configs/camera.yaml"),
-        "model": load_yaml(BASE_DIR / "configs/model.yaml"),
-        "control": load_yaml(BASE_DIR / "configs/control.yaml"),
+        "default": load_yaml(pipeline_dir / "configs/default.yaml"),
+        "camera": load_yaml(pipeline_dir / "configs/camera.yaml"),
+        "model": load_yaml(pipeline_dir / "configs/model.yaml"),
+        "control": load_yaml(pipeline_dir / "configs/control.yaml"),
     }
 
 
@@ -168,7 +249,7 @@ class Preprocessor:
 
 
 class DPURunner:
-    """두 경로가 공유하는 단일 VART runner와 동일한 양/역양자화 구현."""
+    """각 오버레이 단계에서 생성하는 VART runner와 공통 양/역양자화 구현."""
 
     def __init__(self, model_path: Path):
         import xir  # type: ignore
@@ -206,6 +287,29 @@ class DPURunner:
         self.runner.wait(job_id)
         np.multiply(self.out_buf, self.out_scale, out=self.out_f32)
         return self.out_f32
+
+    def close(self) -> None:
+        self.runner = None
+        self.input_tensor = None
+        self.output_tensor = None
+        self.graph = None
+
+
+def array_sha256(array: np.ndarray) -> str:
+    return hashlib.sha256(np.ascontiguousarray(array).view(np.uint8)).hexdigest()
+
+
+def resolve_overlay_path(pipeline_dir: Path, config: dict[str, dict[str, Any]]) -> Path:
+    configured = config["default"].get("actuator", {}).get("overlay_path")
+    if not configured:
+        raise KeyError(f"{pipeline_dir}/configs/default.yaml의 actuator.overlay_path가 필요합니다")
+    path = Path(str(configured)).expanduser()
+    if not path.is_absolute():
+        path = pipeline_dir / path
+    path = path.resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"설정된 비트스트림이 없습니다: {path}")
+    return path
 
 
 class LegacyCPUPostProcessor:
@@ -616,6 +720,155 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def measure_pipeline(
+    name: str,
+    label: str,
+    pipeline_dir: Path,
+    bit_path: Path,
+    model_path: Path,
+    config: dict[str, dict[str, Any]],
+    video_path: Path,
+    args: argparse.Namespace,
+    overlay_class: Any,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """한 비트스트림의 파이프라인을 독립 측정한 뒤 모든 HW 자원을 해제한다."""
+    capture = cv2.VideoCapture(str(video_path))
+    if not capture.isOpened():
+        raise RuntimeError(f"OpenCV가 영상을 열지 못했습니다: {video_path}")
+    overlay = None
+    dpu = None
+    postprocessor = None
+    records: list[dict[str, Any]] = []
+    details: dict[str, Any] = {"bitstream": str(bit_path), "bitstream_sha256": sha256(bit_path)}
+    try:
+        for _ in range(args.skip_frames):
+            ok, _ = capture.read()
+            if not ok:
+                raise RuntimeError("--skip-frames가 영상 길이보다 큽니다")
+        ok, first_frame = capture.read()
+        if not ok or first_frame is None:
+            raise RuntimeError("영상에서 첫 측정 프레임을 읽지 못했습니다")
+
+        print(f"\n[{label}] 오버레이 로드: {bit_path}")
+        overlay = overlay_class(str(bit_path))
+        dpu = DPURunner(model_path)
+        expected_input = (
+            1,
+            int(config["model"]["input_height"]),
+            int(config["model"]["input_width"]),
+            int(config["model"]["input_channels"]),
+        )
+        expected_output = (1, expected_input[1], expected_input[2], 1)
+        if dpu.input_shape != expected_input:
+            raise RuntimeError(f"{label} DPU 입력 shape 불일치: {dpu.input_shape} != {expected_input}")
+        if dpu.output_shape != expected_output:
+            raise RuntimeError(f"{label} DPU 출력 shape 불일치: {dpu.output_shape} != {expected_output}")
+
+        preprocessor = Preprocessor(first_frame.shape, config["camera"], config["model"])
+        if name == "baseline":
+            postprocessor = RTLEquivalentPostProcessor(config["model"], config["control"])
+        else:
+            rtl_base, source = detect_rtl_base(overlay, args.rtl_base)
+            details["rtl_base_address"] = f"0x{rtl_base:08X}"
+            details["rtl_base_source"] = source
+            print(f"[{label}] postproc 주소: 0x{rtl_base:08X} ({source})")
+            postprocessor = RTLPostProcessor(dpu, rtl_base, args.rtl_timeout_ms, config["control"])
+        controller = PDController(config["control"])
+
+        print(f"[{label}] 워밍업: {args.warmup}회 (통계 제외)")
+        for _ in range(args.warmup):
+            run_path(first_frame, preprocessor, dpu, postprocessor)
+
+        frame = first_frame
+        measured_index = 0
+        while frame is not None and (args.frames == 0 or measured_index < args.frames):
+            output, timings = run_path(frame, preprocessor, dpu, postprocessor)
+            command = controller.compute(float(output["steering_error"]), bool(output["valid"]))
+            ref_x, ref_y = output["reference_point"]
+            record: dict[str, Any] = {
+                "frame_id": args.skip_frames + measured_index,
+                "preprocess_sha256": array_sha256(preprocessor.normalized),
+                "dpu_int8_sha256": array_sha256(dpu.out_buf),
+                "steering_error": round(float(output["steering_error"]), 9),
+                "steering_cmd": round(command, 9),
+                "lane_pixels": int(output["lane_pixels"]),
+                "valid": bool(output["valid"]),
+                "reference_x": ref_x,
+                "reference_y": ref_y,
+                "raw_error_q15": int(output["raw_error_q15"]),
+                **{key: round(value, 6) for key, value in timings.items()},
+            }
+            if name == "rtl":
+                record["copy_ms"] = round(float(output["copy_ms"]), 6)
+                record["rtl_ms"] = round(float(output["rtl_ms"]), 6)
+            records.append(record)
+            measured_index += 1
+            if args.print_every > 0 and (measured_index == 1 or measured_index % args.print_every == 0):
+                print(
+                    f"[{label}] frame {measured_index:5d}: "
+                    f"pre={timings['preprocess_ms']:.3f} ms, "
+                    f"DPU={timings['inference_ms']:.3f} ms, "
+                    f"post={timings['postprocess_ms']:.3f} ms"
+                )
+            ok, next_frame = capture.read()
+            frame = next_frame if ok and next_frame is not None else None
+
+        if not records:
+            raise RuntimeError(f"{label}에서 측정된 프레임이 없습니다")
+        return records, details
+    finally:
+        capture.release()
+        if isinstance(postprocessor, RTLPostProcessor):
+            postprocessor.close()
+        if dpu is not None:
+            dpu.close()
+        postprocessor = None
+        dpu = None
+        overlay = None
+        gc.collect()
+        print(f"[{label}] 자원 해제 완료")
+
+
+def merge_passes(
+    baseline_records: list[dict[str, Any]], rtl_records: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    if len(baseline_records) != len(rtl_records):
+        raise RuntimeError(
+            f"두 단계의 프레임 수가 다릅니다: SW={len(baseline_records)}, RTL={len(rtl_records)}"
+        )
+    rows: list[dict[str, Any]] = []
+    for baseline, rtl in zip(baseline_records, rtl_records):
+        frame_id = baseline["frame_id"]
+        if frame_id != rtl["frame_id"]:
+            raise RuntimeError(f"프레임 ID 불일치: SW={frame_id}, RTL={rtl['frame_id']}")
+        if baseline["preprocess_sha256"] != rtl["preprocess_sha256"]:
+            raise RuntimeError(f"frame {frame_id}: 전처리 출력 불일치")
+        if baseline["dpu_int8_sha256"] != rtl["dpu_int8_sha256"]:
+            raise RuntimeError(f"frame {frame_id}: 두 비트스트림의 DPU int8 출력 불일치")
+
+        row: dict[str, Any] = {
+            "frame_id": frame_id,
+            "execution_order": "baseline_overlay_pass->release->rtl_overlay_pass",
+        }
+        for prefix, record in (("baseline", baseline), ("rtl", rtl)):
+            for key in (
+                "preprocess_ms", "inference_ms", "postprocess_ms", "pipeline_ms",
+                "steering_error", "steering_cmd", "lane_pixels", "valid",
+                "reference_x", "reference_y", "raw_error_q15",
+            ):
+                row[f"{prefix}_{key}"] = record[key]
+        row["steering_error_abs_diff"] = round(
+            abs(row["baseline_steering_error"] - row["rtl_steering_error"]), 9
+        )
+        row["steering_cmd_abs_diff"] = round(
+            abs(row["baseline_steering_cmd"] - row["rtl_steering_cmd"]), 9
+        )
+        row["rtl_copy_ms"] = rtl["copy_ms"]
+        row["rtl_compute_ms"] = rtl["rtl_ms"]
+        rows.append(row)
+    return rows
+
+
 def main() -> int:
     args = build_parser().parse_args()
     if args.video is not None and args.legacy_video is not None:
@@ -625,8 +878,7 @@ def main() -> int:
     if not video_path.is_file():
         raise FileNotFoundError(
             f"영상이 없습니다: {video_path}\n"
-            "영상 경로를 첫 번째 인자로 지정하세요. 예: "
-            "python3 compare_postprocessing.py drive.mp4"
+            "영상 경로를 첫 번째 인자로 지정하세요. 예: python3 compare_postprocessing.py drive.mp4"
         )
     if args.frames < 0 or args.skip_frames < 0 or args.warmup < 0:
         raise ValueError("--frames, --skip-frames, --warmup은 0 이상이어야 합니다")
@@ -634,163 +886,70 @@ def main() -> int:
         raise ValueError("허용 오차는 0 이상이어야 합니다")
 
     common_hashes = verify_common_inputs()
-    config = load_config()
-    model_path = BASE_DIR / "models/lane_segmentation.xmodel"
-    rtl_bit = RTL_DIR / "configs/dpu/dpu.bit"
+    baseline_config = load_config(BASE_DIR)
+    rtl_config = load_config(RTL_DIR)
+    baseline_bit = resolve_overlay_path(BASE_DIR, baseline_config)
+    rtl_bit = resolve_overlay_path(RTL_DIR, rtl_config)
 
-    capture = cv2.VideoCapture(str(video_path))
-    if not capture.isOpened():
+    probe = cv2.VideoCapture(str(video_path))
+    if not probe.isOpened():
         raise RuntimeError(f"OpenCV가 영상을 열지 못했습니다: {video_path}")
-    total_frames = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
-    video_fps = float(capture.get(cv2.CAP_PROP_FPS))
-    for _ in range(args.skip_frames):
-        ok, _ = capture.read()
-        if not ok:
-            raise RuntimeError("--skip-frames가 영상 길이보다 큽니다")
-    ok, first_frame = capture.read()
-    if not ok or first_frame is None:
-        raise RuntimeError("영상에서 첫 측정 프레임을 읽지 못했습니다")
+    total_frames = int(probe.get(cv2.CAP_PROP_FRAME_COUNT))
+    video_fps = float(probe.get(cv2.CAP_PROP_FPS))
+    width = int(probe.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(probe.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    probe.release()
 
     from pynq_dpu import DpuOverlay  # type: ignore
 
     print(f"공통 설정/xmodel 검증 완료: {len(common_hashes)}개 파일 동일")
-    print(f"영상: {video_path} ({first_frame.shape[1]}x{first_frame.shape[0]}, {video_fps:.3f} fps, {total_frames} frames)")
-    print(f"RTL 오버레이 로드: {rtl_bit}")
-    overlay = DpuOverlay(str(rtl_bit.resolve()))
-    dpu = DPURunner(model_path)
-    expected_input = (
-        1,
-        int(config["model"]["input_height"]),
-        int(config["model"]["input_width"]),
-        int(config["model"]["input_channels"]),
+    print(f"영상: {video_path} ({width}x{height}, {video_fps:.3f} fps, {total_frames} frames)")
+    print(f"1단계 SW bitstream: {baseline_bit}")
+    print(f"2단계 RTL bitstream: {rtl_bit}")
+
+    baseline_records, baseline_details = measure_pipeline(
+        "baseline", "1/2 SW 파이프라인", BASE_DIR, baseline_bit,
+        BASE_DIR / "models/lane_segmentation.xmodel", baseline_config,
+        video_path, args, DpuOverlay,
     )
-    if dpu.input_shape != expected_input:
-        raise RuntimeError(f"모델 입력 shape 불일치: DPU={dpu.input_shape}, config={expected_input}")
-    expected_output = (1, expected_input[1], expected_input[2], 1)
-    if dpu.output_shape != expected_output:
-        raise RuntimeError(
-            f"RTL IP가 기대하는 DPU 출력 shape와 불일치: "
-            f"DPU={dpu.output_shape}, expected={expected_output}"
-        )
+    rtl_records, rtl_details = measure_pipeline(
+        "rtl", "2/2 RTL 파이프라인", RTL_DIR, rtl_bit,
+        RTL_DIR / "models/lane_segmentation.xmodel", rtl_config,
+        video_path, args, DpuOverlay,
+    )
+    rows = merge_passes(baseline_records, rtl_records)
+    print(f"공통 단계 값 검증: {len(rows)}개 프레임의 전처리 및 DPU int8 출력 완전 일치")
 
-    rtl_base, rtl_base_source = detect_rtl_base(overlay, args.rtl_base)
-    print(f"RTL postproc 주소: 0x{rtl_base:08X} ({rtl_base_source})")
-    preprocessors = {
-        "baseline": Preprocessor(first_frame.shape, config["camera"], config["model"]),
-        "rtl": Preprocessor(first_frame.shape, config["camera"], config["model"]),
+    summary = make_summary(rows, args.steering_tolerance, args.timing_tolerance_pct)
+    run_time = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    output_dir = (
+        args.output_dir.expanduser().resolve()
+        if args.output_dir is not None
+        else ROOT / "comparison_results" / run_time
+    )
+    summary["metadata"] = {
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "video": str(video_path),
+        "video_sha256": sha256(video_path),
+        "video_fps": video_fps,
+        "video_total_frames": total_frames,
+        "skip_frames": args.skip_frames,
+        "warmup_iterations_per_overlay": args.warmup,
+        "common_stage_value_check": f"all {len(rows)} frame preprocess/DPU int8 SHA-256 matched",
+        "software_postprocess_spec": "RTLEquivalentPostProcessor embedded in compare_postprocessing.py",
+        "execution_order": "complete baseline overlay pass, release resources, complete RTL overlay pass",
+        "timed_scope": "preprocess + DPU inference + postprocess; video decode/control/hash/output excluded",
+        "baseline": baseline_details,
+        "rtl": rtl_details,
+        "common_file_sha256": common_hashes,
+        "baseline_config": baseline_config,
+        "rtl_config": rtl_config,
+        "python": sys.version,
+        "opencv": cv2.__version__,
+        "numpy": np.__version__,
     }
-    cpu_post = RTLEquivalentPostProcessor(config["model"], config["control"])
-    rtl_post = RTLPostProcessor(dpu, rtl_base, args.rtl_timeout_ms, config["control"])
-    postprocessors = {"baseline": cpu_post, "rtl": rtl_post}
-    controllers = {
-        "baseline": PDController(config["control"]),
-        "rtl": PDController(config["control"]),
-    }
-
-    try:
-        print(f"워밍업: {args.warmup}회 (통계 제외)")
-        for index in range(args.warmup):
-            name = "baseline" if index % 2 == 0 else "rtl"
-            run_path(first_frame, preprocessors[name], dpu, postprocessors[name])
-
-        # 타이머 밖에서 공통 단계가 두 경로에 완전히 같은 값을 만드는지 확인한다.
-        baseline_input = preprocessors["baseline"].run(first_frame)
-        rtl_input = preprocessors["rtl"].run(first_frame)
-        if not np.array_equal(baseline_input, rtl_input):
-            raise RuntimeError("두 경로의 전처리 출력이 동일하지 않습니다")
-        dpu.run(baseline_input)
-        baseline_dpu_int8 = dpu.out_buf.copy()
-        dpu.run(rtl_input)
-        if not np.array_equal(baseline_dpu_int8, dpu.out_buf):
-            raise RuntimeError("동일 입력에 대한 두 DPU int8 출력이 동일하지 않습니다")
-        print("공통 단계 값 검증: 전처리 출력 및 DPU int8 출력 완전 일치")
-
-        rows: list[dict[str, Any]] = []
-        frame = first_frame
-        measured_index = 0
-        while frame is not None and (args.frames == 0 or measured_index < args.frames):
-            # 짝/홀 프레임마다 순서를 바꿔 먼저 실행되는 경로의 편향을 상쇄한다.
-            order = ("baseline", "rtl") if measured_index % 2 == 0 else ("rtl", "baseline")
-            outputs: dict[str, dict[str, Any]] = {}
-            timings: dict[str, dict[str, float]] = {}
-            for name in order:
-                outputs[name], timings[name] = run_path(
-                    frame, preprocessors[name], dpu, postprocessors[name]
-                )
-            commands = {
-                name: controllers[name].compute(
-                    float(outputs[name]["steering_error"]), bool(outputs[name]["valid"])
-                )
-                for name in ("baseline", "rtl")
-            }
-            row: dict[str, Any] = {
-                "frame_id": args.skip_frames + measured_index,
-                "execution_order": "->".join(order),
-            }
-            for name in ("baseline", "rtl"):
-                for key, value in timings[name].items():
-                    row[f"{name}_{key}"] = round(value, 6)
-                row[f"{name}_steering_error"] = round(float(outputs[name]["steering_error"]), 9)
-                row[f"{name}_steering_cmd"] = round(commands[name], 9)
-                row[f"{name}_lane_pixels"] = int(outputs[name]["lane_pixels"])
-                row[f"{name}_valid"] = bool(outputs[name]["valid"])
-                ref_x, ref_y = outputs[name]["reference_point"]
-                row[f"{name}_reference_x"] = ref_x
-                row[f"{name}_reference_y"] = ref_y
-                row[f"{name}_raw_error_q15"] = int(outputs[name]["raw_error_q15"])
-            row["steering_error_abs_diff"] = round(
-                abs(row["baseline_steering_error"] - row["rtl_steering_error"]), 9
-            )
-            row["steering_cmd_abs_diff"] = round(
-                abs(row["baseline_steering_cmd"] - row["rtl_steering_cmd"]), 9
-            )
-            row["rtl_copy_ms"] = round(float(outputs["rtl"]["copy_ms"]), 6)
-            row["rtl_compute_ms"] = round(float(outputs["rtl"]["rtl_ms"]), 6)
-            rows.append(row)
-            measured_index += 1
-            if args.print_every > 0 and (measured_index == 1 or measured_index % args.print_every == 0):
-                print(
-                    f"frame {measured_index:5d}: SW post={timings['baseline']['postprocess_ms']:.3f} ms, "
-                    f"RTL post={timings['rtl']['postprocess_ms']:.3f} ms, "
-                    f"steer diff={row['steering_error_abs_diff']:.6f}"
-                )
-            ok, next_frame = capture.read()
-            frame = next_frame if ok and next_frame is not None else None
-
-        if not rows:
-            raise RuntimeError("측정된 프레임이 없습니다")
-        summary = make_summary(rows, args.steering_tolerance, args.timing_tolerance_pct)
-        run_time = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-        output_dir = (
-            args.output_dir.expanduser().resolve()
-            if args.output_dir is not None
-            else ROOT / "comparison_results" / run_time
-        )
-        summary["metadata"] = {
-            "created_utc": datetime.now(timezone.utc).isoformat(),
-            "video": str(video_path),
-            "video_sha256": sha256(video_path),
-            "video_fps": video_fps,
-            "video_total_frames": total_frames,
-            "skip_frames": args.skip_frames,
-            "warmup_iterations": args.warmup,
-            "common_stage_value_check": "preprocess array_equal and DPU int8 array_equal passed",
-            "software_postprocess_spec": "RTL-equivalent postprocessing.py",
-            "execution_order": "alternating per frame",
-            "timed_scope": "preprocess + DPU inference + postprocess; video decode/control/output excluded",
-            "rtl_bit_sha256": sha256(rtl_bit),
-            "rtl_base_address": f"0x{rtl_base:08X}",
-            "common_file_sha256": common_hashes,
-            "config": config,
-            "python": sys.version,
-            "opencv": cv2.__version__,
-            "numpy": np.__version__,
-        }
-        write_results(output_dir, rows, summary)
-        print_summary(summary, output_dir)
-    finally:
-        capture.release()
-        rtl_post.close()
+    write_results(output_dir, rows, summary)
+    print_summary(summary, output_dir)
     return 0
 
 
